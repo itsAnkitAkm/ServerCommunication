@@ -2,13 +2,24 @@
  * Redis Lists Playground with ioredis
  * -----------------------------------
  * Redis Lists are ordered collections of strings.
- * They are implemented as linked lists, so pushing/popping from
- * either end is very fast.
+ * They are implemented as linked lists (quick push/pop at both ends).
  *
- * Common use cases:
+ * ✅ Use cases:
  *  - Queues (FIFO)
  *  - Stacks (LIFO)
  *  - Recent activity feeds
+ *
+ * ⚡ Performance & Limits:
+ *  - Max elements: ~4 billion (2^32 - 1)
+ *  - Max element size: 512 MB (like strings)
+ *  - Time complexity:
+ *      LPUSH / RPUSH      => O(1)
+ *      LPOP / RPOP        => O(1)
+ *      LLEN               => O(1)
+ *      LINDEX             => O(1)
+ *      LRANGE (m elements)=> O(m)  (linear in number of items returned)
+ *      LREM               => O(n)  (linear in list length)
+ *      BLPOP / BRPOP      => O(1) when element available, blocks otherwise
  *
  * Run: node list.js
  */
@@ -16,19 +27,21 @@
 const client = require("./client"); // ioredis client instance
 
 async function init() {
+  // Clear old data
+  await client.del("tasks");
+
   /**
    * 1. LPUSH / RPUSH
-   * ----------------
+   * O(1)
    * Add elements to the head (LPUSH) or tail (RPUSH) of a list.
    */
-  await client.del("tasks"); // clear old data
   await client.lpush("tasks", "task1"); // tasks = [task1]
   await client.rpush("tasks", "task2"); // tasks = [task1, task2]
   await client.lpush("tasks", "task0"); // tasks = [task0, task1, task2]
 
   /**
    * 2. LRANGE
-   * ----------
+   * O(m) where m = number of elements returned
    * Get a range of elements from a list (start, stop).
    * Use -1 as stop to get till the end.
    */
@@ -37,7 +50,7 @@ async function init() {
 
   /**
    * 3. LPOP / RPOP
-   * ---------------
+   * O(1)
    * Remove and return the first (LPOP) or last (RPOP) element.
    */
   const firstTask = await client.lpop("tasks");
@@ -48,7 +61,7 @@ async function init() {
 
   /**
    * 4. LLEN
-   * --------
+   * O(1)
    * Get the length of a list.
    */
   const len = await client.llen("tasks");
@@ -56,7 +69,7 @@ async function init() {
 
   /**
    * 5. LINDEX
-   * ----------
+   * O(1)
    * Get element at a specific index.
    */
   const taskAt0 = await client.lindex("tasks", 0);
@@ -64,7 +77,7 @@ async function init() {
 
   /**
    * 6. LREM
-   * --------
+   * O(n)
    * Remove occurrences of a value from the list.
    * Syntax: LREM key count value
    * - count > 0: remove first `count` occurrences
@@ -78,7 +91,7 @@ async function init() {
 
   /**
    * 7. BLPOP / BRPOP (Blocking)
-   * ----------------------------
+   * O(1) if element exists; waits if empty
    * Pop an element from a list, waiting if the list is empty.
    * Useful for job queues.
    * (Here we just demonstrate with timeout = 1s)
